@@ -1,0 +1,4 @@
+[pep8]
+ignore = W806
+max-line-length = 85
+exclude = host,extras,transform,rdfs
