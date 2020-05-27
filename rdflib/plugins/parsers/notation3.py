@@ -744,42 +744,50 @@ class SinkParser:
         return i,j,substr
 
     def changeStarToReification(self, argstr, i):
-        if (argstr[i:i + 2] == "<<"):  # We have found rdf* syntax with reification of subject
-            # Converting into rdf reification statement
-            posStart, posEnd, substr = self.getEmbeddedTuple(argstr, i)  # Retrieve the Embedded Triple
+        # Check if the Star statement is present anywhere in the given statement
+        # Find the position and extract this embedded tuple
+        # The star statement could also be present as a subject or an object, check for that
+        if ("<<" in argstr and ">>" in argstr):
+            while (i <= len(argstr)):
+                if (argstr[i:i + 2] == "<<"):  # We have found rdf* syntax with reification of subject
+                    # Converting into rdf reification statement
+                    posStart, posEnd, substr = self.getEmbeddedTuple(argstr, i)  # Retrieve the Embedded Triple
 
-            # Replace this embeddedTriple with a empty node
-            # assign a number to this node for multiple re-ifications possible
-            self.bNodeCounter += 1
-            argstr = argstr[:posStart-2] + "_:s"+str(self.bNodeCounter) +argstr[posEnd+3:]
-            #argstr = argstr[:posStart - 2] + "_:s" + argstr[posEnd + 3:]
+                    # Replace this embeddedTriple with a empty node
+                    # assign a number to this node for multiple re-ifications possible
+                    self.bNodeCounter += 1
+                    argstr = argstr[:posStart-2] + "_:s"+str(self.bNodeCounter) +argstr[posEnd+3:]
+                    #argstr = argstr[:posStart - 2] + "_:s" + argstr[posEnd + 3:]
 
-            # Add the reification triples
-            argstr = argstr + "\n" + substr + "\n"
-            # Get the Subject, predicate and Object of the embedded triple
-            ptr = 0
-            Er = []
-            ptr = self.object(substr, 0, Er)
-            # Esub = Er[0]
-            Esub = substr[:ptr]
-            print(Esub)
+                    # Add the reification triples
+                    argstr = argstr + "\n" + substr + "\n"
+                    # Get the Subject, predicate and Object of the embedded triple
+                    ptr = 0
+                    Er = []
+                    ptr = self.object(substr, 0, Er)
+                    # Esub = Er[0]
+                    Esub = substr[:ptr]
+                    print(Esub)
 
-            Ev = []
-            ptr2 = self.verb(substr, ptr, Ev)
-            Epred = substr[ptr + 1:ptr2]
-            # Edir, Epred = Ev[0]
-            print(Epred)
+                    Ev = []
+                    ptr2 = self.verb(substr, ptr, Ev)
+                    Epred = substr[ptr + 1:ptr2]
+                    # Edir, Epred = Ev[0]
+                    print(Epred)
 
-            objs = []
-            ptr3 = self.objectList(substr, ptr2, objs)
-            # Eobj = objs[0]
-            Eobj = substr[ptr2 + 1:ptr3 - 1]
-            print(Eobj)
+                    objs = []
+                    ptr3 = self.objectList(substr, ptr2, objs)
+                    # Eobj = objs[0]
+                    Eobj = substr[ptr2 + 1:ptr3 - 1]
+                    print(Eobj)
 
-            argstr = argstr + "_:s"+str(self.bNodeCounter)+" rdf:type rdf:Statement ; rdf:subject "+str(Esub)+" ; rdf:predicate "+str(Epred)+" ; rdf:object "+str(Eobj)+" .\n"
-            #argstr = argstr + "_:s rdf:type rdf:Statement ; rdf:subject " + str(Esub) + " ; rdf:predicate " + str(Epred) + " ; rdf:object " + str(Eobj) + " .\n"
-            print("Reified graph is as follows: ")
-            print(argstr)
+                    argstr = argstr + "_:s"+str(self.bNodeCounter)+" rdf:type rdf:Statement ; rdf:subject "+str(Esub)+" ; rdf:predicate "+str(Epred)+" ; rdf:object "+str(Eobj)+" .\n"
+                    #argstr = argstr + "_:s rdf:type rdf:Statement ; rdf:subject " + str(Esub) + " ; rdf:predicate " + str(Epred) + " ; rdf:object " + str(Eobj) + " .\n"
+                    print("Reified graph is as follows: ")
+                    print(argstr)
+
+                else:
+                    i = i + 1
 
         return argstr
 
