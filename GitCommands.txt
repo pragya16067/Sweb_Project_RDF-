@@ -1,0 +1,7 @@
+git remote add originPersonal https://github.com/pragya16067/Sweb_Project_RDF-.git
+
+git add .
+
+git commit -m "msg"
+
+git push -u originPersonal master
