@@ -364,6 +364,7 @@ class SinkParser:
         the  # will get added during qname processing """
 
         self._bindings = {}
+        self.bNodeCounter = 0
         if thisDoc != "":
             assert ':' in thisDoc, "Document URI not absolute: <%s>" % thisDoc
             self._bindings[""] = thisDoc + "#"   # default
@@ -473,7 +474,10 @@ class SinkParser:
             if j < 0:
                 return
 
-            i = self.directiveOrStatement(s, j)
+            result = self.directiveOrStatement(s, j)
+            #print ("I was returned",result)
+            s = result[0]
+            i = result[1]
             if i < 0:
                 #print("# next char: %s" % s[j])
                 self.BadSyntax(s, j,
@@ -483,22 +487,27 @@ class SinkParser:
 
         i = self.skipSpace(argstr, h)
         if i < 0:
-            return i    # EOF
+            return argstr, i    # EOF
 
         if self.turtle:
             j = self.sparqlDirective(argstr, i) # TO EVALUATE DIRECTIVE STATEMENTS: Binds the prefix to namespaces and takes care of BASE
             if j >= 0:
-                return j
+                return argstr, j
 
         j = self.directive(argstr, i) #Check for other Directive statements (BIND, FORALL, FORSOME, other keyqords)
         if j >= 0:
-            return self.checkDot(argstr, j)
+            return argstr, self.checkDot(argstr, j)
+
+        #Check if the format is rdf* or not
+        #If it is then change the string to include reification
+        argstr = self.changeStarToReification(argstr, i)
 
         j = self.statement(argstr, i)
+        #print ("I got this ",j)
         if j >= 0:
-            return self.checkDot(argstr, j)
+            return argstr, self.checkDot(argstr, j)
 
-        return j
+        return argstr, j
 
      # @@I18N
      # _namechars = string.lowercase + string.uppercase + string.digits + '_-'
@@ -734,33 +743,48 @@ class SinkParser:
         substr = argstr[i:j+1] + " ."
         return i,j,substr
 
-    def statement(self, argstr, i):
-        r = []
-        if(argstr[i:i+2]=="<<"): #We have found rdf_star syntax with reification of subject
-            posStart, posEnd, substr = self.getEmbeddedTuple(argstr,i) #Retrieve the Embedded Triple
+    def changeStarToReification(self, argstr, i):
+        if (argstr[i:i + 2] == "<<"):  # We have found rdf* syntax with reification of subject
+            # Converting into rdf reification statement
+            posStart, posEnd, substr = self.getEmbeddedTuple(argstr, i)  # Retrieve the Embedded Triple
 
-            #Replace this embeddedTriple with a empty node
-            argstr = argstr[:posStart-2] + "_:s" +argstr[posEnd+3:]
+            # Replace this embeddedTriple with a empty node
+            # assign a number to this node for multiple re-ifications possible
+            self.bNodeCounter += 1
+            argstr = argstr[:posStart-2] + "_:s"+str(self.bNodeCounter) +argstr[posEnd+3:]
+            #argstr = argstr[:posStart - 2] + "_:s" + argstr[posEnd + 3:]
 
-            #Add the reification triples
-            argstr = argstr + "\n" + substr +"\n"
-            #Get the Subject, predicate and Object of the embedded triple
+            # Add the reification triples
+            argstr = argstr + "\n" + substr + "\n"
+            # Get the Subject, predicate and Object of the embedded triple
             ptr = 0
             Er = []
             ptr = self.object(substr, 0, Er)
-            Esub = Er[0]
+            # Esub = Er[0]
+            Esub = substr[:ptr]
+            print(Esub)
 
             Ev = []
-            ptr = self.verb(substr, ptr, Ev)
-            Edir, Epred = Ev[0]
+            ptr2 = self.verb(substr, ptr, Ev)
+            Epred = substr[ptr + 1:ptr2]
+            # Edir, Epred = Ev[0]
+            print(Epred)
 
             objs = []
-            ptr = self.objectList(substr, ptr, objs)
-            Eobj = objs[0]
+            ptr3 = self.objectList(substr, ptr2, objs)
+            # Eobj = objs[0]
+            Eobj = substr[ptr2 + 1:ptr3 - 1]
+            print(Eobj)
 
-            argstr = argstr + "_:s rdf:type rdf:Statement ; rdf:subject "+str(Esub)+" ; rdf:predicate "+str(Epred)+" ; rdf:object "+str(Eobj)+" .\n"
-            print (argstr)
+            argstr = argstr + "_:s"+str(self.bNodeCounter)+" rdf:type rdf:Statement ; rdf:subject "+str(Esub)+" ; rdf:predicate "+str(Epred)+" ; rdf:object "+str(Eobj)+" .\n"
+            #argstr = argstr + "_:s rdf:type rdf:Statement ; rdf:subject " + str(Esub) + " ; rdf:predicate " + str(Epred) + " ; rdf:object " + str(Eobj) + " .\n"
+            print("Reified graph is as follows: ")
+            print(argstr)
 
+        return argstr
+
+    def statement(self, argstr, i):
+        r = []
         i = self.object(
             argstr, i, r)   # Allow literal for subject - extends RDF
         if i < 0:
